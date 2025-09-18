@@ -4,7 +4,7 @@ import pandas as pd
 import scipy.special as sps
 from scipy.interpolate import Akima1DInterpolator
 
-#DEFINITION OF SIZE DISTRIBUTIONS
+#SIZE DISTRIBUTIONS AND AUXILIARY FUNCTIONS
 def GammaSD(a, b, r): #As described in Mishchenko and Travis 1998 Eq. (39).
     var1 = r/(a*b)
     var2 = (1-3*b)/b
@@ -30,6 +30,36 @@ def SD(a, b, r, SD_choice):
         return GammaSD(a,b,r)
     elif (SD_choice == 2):
         return LogNormalSD(a,b,r)
+    
+def OptPropAxis(OptProp: pd.DataFrame):
+
+    #Read from isca.dat the wvl axis
+    k = 0
+    wvls = []
+    for i in range(len(OptProp[0]) - 1):
+        if i == 0:
+            wvls.append(OptProp.iloc[0,0])
+            wvl_temp = wvls[k]
+        if wvl_temp != OptProp.iloc[i+1,0]:
+            wvls.append(OptProp.iloc[i+1,0])
+            k = k + 1
+            wvl_temp = wvls[k]
+            
+    wvls = np.array(wvls)
+    wvls_num = len(wvls)
+
+    #Read from isca.dat the size axis
+    sizes = []
+    for i in range(len(OptProp[1]) - 1):
+        if i == 0:
+            sizes.append(OptProp.iloc[0,1])
+        if OptProp.iloc[i+1,1] not in sizes:
+            sizes.append(OptProp.iloc[i+1,1])
+
+    sizes = np.array(sizes)
+    sizes_num = len(sizes)
+
+    return wvls, wvls_num, sizes, sizes_num
 
 ########################################
 
@@ -139,31 +169,8 @@ def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, ou
 
     OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
 
-    #Read from isca.dat the wvl axis
-    k = 0
-    wvls = []
-    for i in range(len(OptProp[0]) - 1):
-        if i == 0:
-            wvls.append(OptProp.iloc[0,0])
-            wvl_temp = wvls[k]
-        if wvl_temp != OptProp.iloc[i+1,0]:
-            wvls.append(OptProp.iloc[i+1,0])
-            k = k + 1
-            wvl_temp = wvls[k]
-            
-    wvls = np.array(wvls)
-    wvls_num = len(wvls)
-
-    #Read from isca.dat the size axis
-    sizes = []
-    for i in range(len(OptProp[1]) - 1):
-        if i == 0:
-            sizes.append(OptProp.iloc[0,1])
-        if OptProp.iloc[i+1,1] not in sizes:
-            sizes.append(OptProp.iloc[i+1,1])
-
-    sizes = np.array(sizes)
-    sizes_num = len(sizes)
+    #Read axis
+    wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
 
     #Initialize arrays
     qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
@@ -293,31 +300,8 @@ def OptPropAve_Disc(OptProp_path: str, SD_path: str, plot: bool = True):
     rmie_SD = SD.iloc[:,0].values #rmie from the SD is the sizes at which we want to interpolate
     n_SD = SD.iloc[:,1].values
 
-    #Read from isca.dat the wvl axis
-    k = 0
-    wvls = []
-    for i in range(len(OptProp[0]) - 1):
-        if i == 0:
-            wvls.append(OptProp.iloc[0,0])
-            wvl_temp = wvls[k]
-        if wvl_temp != OptProp.iloc[i+1,0]:
-            wvls.append(OptProp.iloc[i+1,0])
-            k = k + 1
-            wvl_temp = wvls[k]
-            
-    wvls = np.array(wvls)
-    wvls_num = len(wvls)
-
-    #Read from isca.dat the size axis
-    sizes = []
-    for i in range(len(OptProp[1]) - 1):
-        if i == 0:
-            sizes.append(OptProp.iloc[0,1])
-        if OptProp.iloc[i+1,1] not in sizes:
-            sizes.append(OptProp.iloc[i+1,1])
-
-    sizes = np.array(sizes)
-    sizes_num = len(sizes)
+    #Read axis
+    wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
 
     #Read values
     parea_temp = OptProp.iloc[:,3] #Projected area
@@ -504,31 +488,8 @@ def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
     for i in OptProp_path:
         OptProp = pd.read_csv(i, sep='\\s+', comment="#", header=None)
 
-        #Read from isca.dat the wvl axis
-        k = 0
-        wvls = []
-        for j in range(len(OptProp[0]) - 1):
-            if j == 0:
-                wvls.append(OptProp.iloc[0,0])
-                wvl_temp = wvls[k]
-            if wvl_temp != OptProp.iloc[j+1,0]:
-                wvls.append(OptProp.iloc[j+1,0])
-                k = k + 1
-                wvl_temp = wvls[k]
-            
-        wvls = np.array(wvls)
-        wvls_num = len(wvls)
-
-        #Read from isca.dat the size axis
-        sizes = []
-        for j in range(len(OptProp[1]) - 1):
-            if j == 0:
-                sizes.append(OptProp.iloc[0,1])
-            if OptProp.iloc[j+1,1] not in sizes:
-                sizes.append(OptProp.iloc[j+1,1])
-
-        sizes = np.array(sizes)
-        sizes_num = len(sizes)
+        #Read axis
+        wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
 
         #Initialize arrays
         qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
