@@ -494,3 +494,132 @@ def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
         plt.show()
 
     return
+
+
+def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
+
+    fig, ax = plt.subplots(3, 1, figsize=(12,7))
+
+    #Loop to plot files
+    for i in OptProp_path:
+        OptProp = pd.read_csv(i, sep='\\s+', comment="#", header=None)
+
+        #Read from isca.dat the wvl axis
+        k = 0
+        wvls = []
+        for j in range(len(OptProp[0]) - 1):
+            if j == 0:
+                wvls.append(OptProp.iloc[0,0])
+                wvl_temp = wvls[k]
+            if wvl_temp != OptProp.iloc[j+1,0]:
+                wvls.append(OptProp.iloc[j+1,0])
+                k = k + 1
+                wvl_temp = wvls[k]
+            
+        wvls = np.array(wvls)
+        wvls_num = len(wvls)
+
+        #Read from isca.dat the size axis
+        sizes = []
+        for j in range(len(OptProp[1]) - 1):
+            if j == 0:
+                sizes.append(OptProp.iloc[0,1])
+            if OptProp.iloc[j+1,1] not in sizes:
+                sizes.append(OptProp.iloc[j+1,1])
+
+        sizes = np.array(sizes)
+        sizes_num = len(sizes)
+
+        #Initialize arrays
+        qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
+        ssa = np.zeros((wvls_num, sizes_num))
+        g = np.zeros((wvls_num, sizes_num))
+        rmie_TAMU = np.zeros((wvls_num, sizes_num))
+
+        #Read values
+        parea_temp = OptProp.iloc[:,3] #Surface area equivalent radius
+        qext_temp = OptProp.iloc[:,4] #Extinction efficiency
+        ssa_temp = OptProp.iloc[:,5] #Single Scattering albedo
+        g_temp = OptProp.iloc[:,6] #Asymmetry factor
+
+        #Creates 2-dim arrays of optical properties. First index indicates wavelength, second size bin
+        k=0 #k ensures that when reading the TAMU output we copy only the unique wavelengths
+        for j in range(wvls_num):
+            for l in range(sizes_num):
+                qext[j,l] = qext_temp[k]
+                ssa[j,l] = ssa_temp[k]
+                g[j,l] = g_temp[k]
+                rmie_TAMU[j,l] = np.sqrt(parea_temp[k]/np.pi) #Here we transform the projected surface area outputed by TAMUdust into rmie
+                k=k+1
+
+        #Choose wvl or size to plot
+        if mode == "wvls":
+            plot_idx = np.argmin(np.abs(rmie_TAMU[0,:] - value))
+            plot_value = sizes[plot_idx]
+
+            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
+            ax[0].set_xscale('log')
+            ax[0].set_ylim(0, 3)
+            ax[0].set_ylabel(r'$Q_{ext}$')
+            ax[0].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
+
+            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
+            ax[1].set_ylim(0, 1)
+            ax[1].set_xscale('log')
+            ax[1].set_ylabel(r'$\omega$')
+            ax[1].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[1].set_title(r'Single scattering albedo, $\omega$')
+
+            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
+            ax[2].set_xscale('log')
+            ax[2].set_ylim(0, 1)
+            ax[2].set_ylabel('g')
+            ax[2].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[2].set_title(r'Asymmetry factor, g')
+
+            for j in range(3):
+                ax[j].legend(loc='best') 
+
+
+        elif mode == "sizes":
+            plot_idx = np.argmin(np.abs(wvls - value))
+            plot_value = wvls[plot_idx]
+
+            rmie_TAMU[plot_idx,:] = rmie_TAMU[plot_idx,:]*2*np.pi / plot_value #Transform rmie into size parameter
+
+            ax[0].plot(rmie_TAMU[plot_idx,:], qext[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[0].plot(rmie_TAMU[plot_idx,:], qext[plot_idx,:], "o", markersize=2, color="black")
+            ax[0].set_xscale('log')
+            ax[0].set_ylim(0, 3)
+            ax[0].set_ylabel(r'$Q_{ext}$')
+            ax[0].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
+
+            ax[1].plot(rmie_TAMU[plot_idx,:], ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[1].plot(rmie_TAMU[plot_idx,:], ssa[plot_idx,:], "o", markersize=2, color="black")
+            ax[1].set_ylim(0, 1)
+            ax[1].set_xscale('log')
+            ax[1].set_ylabel(r'$\omega$')
+            ax[1].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[1].set_title(r'Single scattering albedo, $\omega$')
+
+            ax[2].plot(rmie_TAMU[plot_idx,:], g[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[2].plot(rmie_TAMU[plot_idx,:], g[plot_idx,:], "o", markersize=2, color="black")
+            ax[2].set_xscale('log')
+            ax[2].set_ylim(0, 1)
+            ax[2].set_ylabel('g')
+            ax[2].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[2].set_title(r'Asymmetry factor, g')
+
+            for j in range(3):
+                ax[j].legend(loc='best') 
+
+    plt.tight_layout()
+    plt.show()
+
+
+    return
