@@ -32,7 +32,6 @@ def SD(a, b, r, SD_choice):
         return LogNormalSD(a,b,r)
     
 def OptPropAxis(OptProp: pd.DataFrame):
-
     #Read from isca.dat the wvl axis
     k = 0
     wvls = []
@@ -59,17 +58,60 @@ def OptPropAxis(OptProp: pd.DataFrame):
     sizes = np.array(sizes)
     sizes_num = len(sizes)
 
-    return wvls, wvls_num, sizes, sizes_num
+    #Obtain rmie axis averaged over wvls
+    # This is only really used in OptPropExtract 
+    parea_temp = OptProp[3]
+    parea = np.zeros((wvls_num,sizes_num))
+    rmie = np.zeros((wvls_num,sizes_num))
+
+    k = 0
+    for i in range(wvls_num):
+        for j in range(sizes_num):
+                parea[i,j] = parea_temp[k]
+                rmie[i,j] = np.sqrt(parea_temp[k]/np.pi)
+                k = k+1
+    rmie_avg = np.mean(rmie, axis=0)
+
+    return wvls, wvls_num, rmie_avg, sizes_num
+
+def OptPropArrays(OptProp: pd.DataFrame):
+    #Read axis
+    wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
+
+    #Initialize arrays
+    parea = np.zeros((wvls_num, sizes_num))
+    qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
+    ssa = np.zeros((wvls_num, sizes_num))
+    g = np.zeros((wvls_num, sizes_num))
+
+    #Read values
+    parea_temp = OptProp.iloc[:,3] #Projected surface area
+    qext_temp = OptProp.iloc[:,4] #Extinction efficiency
+    ssa_temp = OptProp.iloc[:,5] #Single Scattering albedo
+    g_temp = OptProp.iloc[:,6] #Asymmetry factor
+
+    #Creates 2-dim arrays of optical properties. First index indicates wavelength, second size bin
+    k=0 #k ensures that when reading the TAMU output we copy only the unique wavelengths
+    for i in range(wvls_num):
+        for j in range(sizes_num):
+            parea[i,j] = parea_temp[k]
+            qext[i,j] = qext_temp[k]
+            ssa[i,j] = ssa_temp[k]
+            g[i,j] = g_temp[k]
+            k=k+1
+    
+    return parea, qext, ssa, g
 
 ########################################
 
-def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list, output_path: str = "outputWriteGCM.dat"):
+def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
     #Some necessary actions and definitions
     wvls_num = len(wvls)
     sizes_num = len(sizes)
     files_num = len(files)
     sizes = sizes * 1e-6 #Change from um to m (LMD-GCM reads meters)
     wvls = wvls * 1e-6
+    output_path = "outputWriteGCM.dat"
 
     #Foolproofing
     if files_num != sizes_num:
@@ -165,18 +207,17 @@ def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list, ou
 
     return
 
-def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, output_path: str = "OptPropAve.dat", plot: bool = True):
+def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, plot: bool = True):
 
     OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
 
     #Read axis
     wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
 
+    #Read essential arrays
+    parea, qext, ssa, g = OptPropArrays(OptProp)
+
     #Initialize arrays
-    qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
-    ssa = np.zeros((wvls_num, sizes_num))
-    g = np.zeros((wvls_num, sizes_num))
-    parea = np.zeros((wvls_num, sizes_num))
     qsca = np.zeros((wvls_num, sizes_num))
     rmie_TAMU = np.zeros((wvls_num, sizes_num))
 
@@ -189,22 +230,10 @@ def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, ou
     n_A_qsca = np.zeros((wvls_num, sizes_num))
     n_A_qsca_g = np.zeros((wvls_num, sizes_num))
 
-    #Read values
-    parea_temp = OptProp.iloc[:,3] #Surface area equivalent radius
-    qext_temp = OptProp.iloc[:,4] #Extinction efficiency
-    ssa_temp = OptProp.iloc[:,5] #Single Scattering albedo
-    g_temp = OptProp.iloc[:,6] #Asymmetry factor
-
-    #Creates 2-dim arrays of optical properties. First index indicates wavelength, second size bin
-    k=0 #k ensures that when reading the TAMU output we copy only the unique wavelengths
+    #Here we transform the projected surface area outputed by TAMUdust into rmie
     for i in range(wvls_num):
         for j in range(sizes_num):
-            qext[i,j] = qext_temp[k]
-            ssa[i,j] = ssa_temp[k]
-            g[i,j] = g_temp[k]
-            parea[i,j] = parea_temp[k]
-            rmie_TAMU[i,j] = np.sqrt(parea_temp[k]/np.pi) #Here we transform the projected surface area outputed by TAMUdust into rmie
-            k=k+1
+            rmie_TAMU[i,j] = np.sqrt(parea[i,j]/np.pi) 
 
     #Calculates the scattering efficiency Qsca from ssa and Qext
     for i in range(wvls_num):
@@ -303,16 +332,10 @@ def OptPropAve_Disc(OptProp_path: str, SD_path: str, plot: bool = True):
     #Read axis
     wvls, wvls_num, sizes, sizes_num = OptPropAxis(OptProp)
 
-    #Read values
-    parea_temp = OptProp.iloc[:,3] #Projected area
-    qext_temp = OptProp.iloc[:,4] #Extinction efficiency
-    ssa_temp = OptProp.iloc[:,5] #Single Scattering albedo
-    g_temp = OptProp.iloc[:,6] #Asymmetry factor
+    #Read essential arrays
+    parea, qext, ssa, g = OptPropArrays(OptProp)
 
     #Array initialization
-    qext = np.zeros((wvls_num, sizes_num))
-    ssa = np.zeros((wvls_num, sizes_num))
-    g = np.zeros((wvls_num, sizes_num))
     rmie_TAMU = np.zeros((wvls_num, sizes_num))
 
     qext_inter = np.zeros((wvls_num, SD_num))
@@ -330,15 +353,10 @@ def OptPropAve_Disc(OptProp_path: str, SD_path: str, plot: bool = True):
     ssa_avg = np.zeros((wvls_num))
     g_avg = np.zeros((wvls_num))
 
-    #Creates 2-dim arrays of optical properties. First index indicates wavelength, second size bin
-    k=0 #k ensures that when reading the TAMU output we copy only the unique wavelengths
+    #Here we transform the projected surface area outputed by TAMUdust into rmie
     for i in range(wvls_num):
         for j in range(sizes_num):
-            qext[i,j] = qext_temp[k]
-            ssa[i,j] = ssa_temp[k]
-            g[i,j] = g_temp[k]
-            rmie_TAMU[i,j] = np.sqrt(parea_temp[k]/np.pi) #Here we transform the projected surface area outputed by TAMUdust into rmie
-            k=k+1
+            rmie_TAMU[i,j] = np.sqrt(parea[i,j]/np.pi)
 
     #Interpolate
     for i in range(wvls_num):
@@ -516,7 +534,6 @@ def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
         #Choose wvl or size to plot
         if mode == "wvls":
             plot_idx = np.argmin(np.abs(rmie_TAMU[0,:] - value))
-            plot_value = sizes[plot_idx]
 
             ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
             ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
@@ -582,5 +599,107 @@ def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
     plt.tight_layout()
     plt.show()
 
+    return
 
+
+def OptPropExtract(OptProp_path: str, header: str):
+
+    OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
+    output_path = "outputOptPropExtract.dat"
+
+    #Read axis
+    wvls, wvls_num, rmie_avg, rmie_num = OptPropAxis(OptProp)
+    wvls = wvls * 1e-6
+    rmie_avg = rmie_avg * 1e-6
+
+    #Read essential arrays
+    parea, qext, ssa, g = OptPropArrays(OptProp)
+
+    #Makes sure ssa is not < 0
+    for i in range(wvls_num):
+        for j in range(rmie_num):
+            if ssa[i,j] < 0.:
+                ssa[i,j] = 0.
+
+    #Write header, nº of wvls and nº of radii in file
+    with open(output_path, "w") as f:
+        f.write(f"{header}\n")
+        f.write(f"# Number of wavelengths (nwvl):\n  {wvls_num}\n")
+        f.write(f"# Number of radius (nsize):\n  {rmie_num}\n")
+
+    #Write wvls axis
+    with open(output_path, "a") as f:
+        f.write("# Wavelength axis (wvl):\n")
+        k = 0
+        groups = wvls_num//5 #Number of groups of 5 lines
+        lastline = wvls_num - groups*5 #Number of elements in last line either 1,2,3 or 4
+        for i in range(groups):
+            f.write(f" {wvls[0+k]:.6E} {wvls[1+k]:.6E} {wvls[2+k]:.6E} {wvls[3+k]:.6E} {wvls[4+k]:.6E}\n")
+            k = k + 5
+        if lastline != 0:
+            for i in range(lastline):
+                f.write(f" {wvls[k+i]:.6E}")
+            f.write("\n")
+
+    #Write sizes axis
+    with open(output_path, "a") as f:
+        f.write("# Particle size axis (radius):\n")
+        k = 0
+        groups = rmie_num//5 #Number of groups of 5 lines
+        lastline = rmie_num - groups*5 #Number of elements in last line either 1,2,3 or 4
+        for i in range(groups):
+            f.write(f" {rmie_avg[0+k]:.6E} {rmie_avg[1+k]:.6E} {rmie_avg[2+k]:.6E} {rmie_avg[3+k]:.6E} {rmie_avg[4+k]:.6E}\n")
+            k = k + 5
+        if lastline != 0:
+            for i in range(lastline):
+                f.write(f" {rmie_avg[k+i]:.6E}")
+            f.write("\n")
+
+    #Write extinction coefficient
+    with open(output_path, "a") as f:
+        f.write("# Extinction coef. Qext (ep):\n")
+        groups = wvls_num//5
+        lastline = wvls_num - groups*5        
+        for i in range(rmie_num):
+            k = 0
+            f.write(f"# Radius number     {i+1}\n")
+            for j in range(groups):
+                f.write(f" {qext[0+k,i]:.6E} {qext[1+k,i]:.6E} {qext[2+k,i]:.6E} {qext[3+k,i]:.6E} {qext[4+k,i]:.6E}\n")
+                k = k + 5
+            if lastline != 0:
+                for l in range(lastline):
+                    f.write(f" {qext[l+j,i]:.6E}")
+                f.write("\n")
+    
+    #Write single scattering albedo
+    with open(output_path, "a") as f:
+        f.write("# Single Scat Albedo (omeg):\n")
+        groups = wvls_num//5
+        lastline = wvls_num - groups*5        
+        for i in range(rmie_num):
+            k = 0
+            f.write(f"# Radius number     {i+1}\n")
+            for j in range(groups):
+                f.write(f" {ssa[0+k,i]:.6E} {ssa[1+k,i]:.6E} {ssa[2+k,i]:.6E} {ssa[3+k,i]:.6E} {ssa[4+k,i]:.6E}\n")
+                k = k + 5
+            if lastline != 0:
+                for l in range(lastline):
+                    f.write(f" {ssa[l+j,i]:.6E}")
+                f.write("\n")
+
+    #Write asymmetry parameter
+    with open(output_path, "a") as f:
+        f.write("# Assymetry Factor (gfactor):\n")
+        groups = wvls_num//5
+        lastline = wvls_num - groups*5        
+        for i in range(rmie_num):
+            k = 0
+            f.write(f"# Radius number     {i+1}\n")
+            for j in range(groups):
+                f.write(f" {g[0+k,i]:.6E} {g[1+k,i]:.6E} {g[2+k,i]:.6E} {g[3+k,i]:.6E} {g[4+k,i]:.6E}\n")
+                k = k + 5
+            if lastline != 0:
+                for l in range(lastline):
+                    f.write(f" {g[l+j,i]:.6E}")
+                f.write("\n") 
     return
