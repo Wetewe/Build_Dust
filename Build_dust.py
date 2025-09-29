@@ -251,7 +251,7 @@ def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, pl
 
         qext_avg[i] = numer_qext/denom_qext
 
-        if qext_avg[i] < 0:
+        if qext_avg[i] <= 0:
             qext_avg[i] = 0
 
         #<ssa>
@@ -262,10 +262,10 @@ def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, pl
 
         ssa_avg[i] = numer_ssa/denom_ssa
 
-        if ssa_avg[i] < 0:
+        if ssa_avg[i] <= 0:
             ssa_avg[i] = 0
 
-        #<ssa>
+        #<g>
         n_A_qsca_g[i,:] = SD(r_eff, v_eff, rmie_TAMU[i,:], SD_choice)*parea[i,:]*qsca[i,:]*g[i,:]
 
         numer_g = np.trapezoid(n_A_qsca_g[i,:],rmie_TAMU[i,:])
@@ -615,11 +615,14 @@ def OptPropExtract(OptProp_path: str, header: str):
     #Read essential arrays
     parea, qext, ssa, g = OptPropArrays(OptProp)
 
-    #Makes sure ssa is not < 0
+    #Makes sure ssa is not < 0 or > 1
     for i in range(wvls_num):
         for j in range(rmie_num):
-            if ssa[i,j] < 0.:
-                ssa[i,j] = 0.
+            if ssa[i,j] <= 0.:
+                ssa[i,j] = 0
+            #if g[i,j] <= 0.:
+                #g[i,j] = np.abs(0)
+
 
     #Write header, nº of wvls and nº of radii in file
     with open(output_path, "w") as f:
