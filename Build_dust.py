@@ -166,7 +166,7 @@ def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {Q_ext[l+j]:.6E}")
+                    f.write(f" {Q_ext[l+k]:.6E}")
                 f.write("\n")
 
     #Write single scattering albedo                
@@ -184,7 +184,7 @@ def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {ssa[l+j]:.6E}")
+                    f.write(f" {ssa[l+k]:.6E}")
                 f.write("\n")
     
     #Write asymmetry parameter
@@ -202,7 +202,7 @@ def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {g[l+j]:.6E}")
+                    f.write(f" {g[l+k]:.6E}")
                 f.write("\n")    
 
     return
@@ -498,7 +498,7 @@ def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
     return
 
 
-def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
+def OptPropPlotTAMU(*OptProp_path: str, mode: str = "wvls", value: float):
 
     fig, ax = plt.subplots(3, 1, figsize=(12,7))
 
@@ -601,6 +601,171 @@ def OptPropPlot(*OptProp_path: str, mode: str = "wvls", value: float):
 
     return
 
+def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
+
+    fig, ax = plt.subplots(3, 1, figsize=(12,7))
+
+    #From the GCM OptProp file we want to extract the optical properties in order to plot them
+    #Loop to plot files
+    for i in OptProp_path:
+
+        #First we want to read wvls_num and sizes_num
+        nwvl_found = False
+        nwvl_assigned = False
+        nsize_found = False
+        nsize_assigned = False
+
+        with open(i, "r", encoding="utf-8") as OptProp:
+            for linea_num, linea in enumerate(OptProp, start=1):
+                if nwvl_found == True:
+                    split = linea.split()
+                    wvls_num = int(split[0])
+                    nwvl_found = False
+                    nwvl_assigned = True
+                if "(nwvl):" in linea:
+                    nwvl_found = True
+                if nsize_found == True:
+                    split = linea.split()
+                    sizes_num = int(split[0])
+                    nsize_found = False
+                    nsize_assigned = True
+                if "(nsize):" in linea:
+                    nsize_found = True
+                if nwvl_assigned == True and nsize_assigned == True:
+                    break
+
+        #Then we want to obtain the wvls, sizes and properties arrays
+        with open(i, "r", encoding="utf-8") as OptProp:
+            lineas = OptProp.readlines()
+            wvls = []
+            sizes = []
+            qext_temp = []
+            ssa_temp = []
+            g_temp = []
+            case = None
+
+            for linea in lineas:
+                linea = linea.strip()
+                if not linea or linea.startswith("#"):
+                    if "Wavelength axis" in linea:
+                        case = "wvls"
+                    elif "Particle size axis" in linea:
+                        case = "sizes"
+                    elif "Extinction coef." in linea:
+                        case = "qext"
+                    elif "Single Scat Albedo" in linea:
+                        case = "ssa"
+                    elif "Assymetry Factor" in linea:
+                        case = "g"
+                    continue
+
+                values = [float(x) for x in linea.split()]
+
+                if case == "wvls":
+                    wvls.extend(values)
+                elif case == "sizes":
+                    sizes.extend(values)
+                elif case == "qext":
+                    qext_temp.extend(values)
+                elif case == "ssa":
+                    ssa_temp.extend(values)
+                elif case == "g":
+                    g_temp.extend(values)
+            
+            wvls = np.array(wvls) * 1e6 #Covert to numpy array and change m to um
+            sizes = np.array(sizes) *1e6
+            qext_temp = np.array(qext_temp)
+            ssa_temp = np.array(ssa_temp)
+            g_temp = np.array(g_temp)
+
+        #Now we can proceed exactly as with OptPropPlotTAMU
+        #Initialize arrays
+        qext = np.zeros((wvls_num, sizes_num)) #Size dependent optical properties
+        ssa = np.zeros((wvls_num, sizes_num))
+        g = np.zeros((wvls_num, sizes_num))
+
+        #Creates 2-dim arrays of optical properties. First index indicates wavelength, second size bin
+        k=0 #k ensures that when reading the TAMU output we copy only the unique wavelengths
+        for j in range(sizes_num):
+            for l in range(wvls_num):
+                qext[l,j] = qext_temp[k]
+                ssa[l,j] = ssa_temp[k]
+                g[l,j] = g_temp[k]
+                k=k+1
+
+        #Choose wvl or size to plot
+        if mode == "wvls":
+
+            plot_idx = np.argmin(np.abs(sizes - value))
+
+            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
+            ax[0].set_xscale('log')
+            ax[0].set_ylim(0, 4)
+            ax[0].set_ylabel(r'$Q_{ext}$')
+            ax[0].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
+
+            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
+            ax[1].set_ylim(0, 1)
+            ax[1].set_xscale('log')
+            ax[1].set_ylabel(r'$\omega$')
+            ax[1].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[1].set_title(r'Single scattering albedo, $\omega$')
+
+            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
+            ax[2].set_xscale('log')
+            ax[2].set_ylim(0, 1)
+            ax[2].set_ylabel('g')
+            ax[2].set_xlabel(r'Wavelength ($\mu$m)')
+            ax[2].set_title(r'Asymmetry factor, g')
+
+            for j in range(3):
+                ax[j].legend(loc='best') 
+
+
+        elif mode == "sizes":
+            plot_idx = np.argmin(np.abs(wvls - value))
+            plot_value = wvls[plot_idx]
+
+            sizes = sizes*2*np.pi / plot_value #Transform rmie into size parameter
+
+            ax[0].plot(sizes, qext[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[0].plot(sizes, qext[plot_idx,:], "o", markersize=2, color="black")
+            ax[0].set_xscale('log')
+            ax[0].set_ylim(0, 4)
+            ax[0].set_ylabel(r'$Q_{ext}$')
+            ax[0].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
+
+            ax[1].plot(sizes, ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[1].plot(sizes, ssa[plot_idx,:], "o", markersize=2, color="black")
+            ax[1].set_ylim(0, 1)
+            ax[1].set_xscale('log')
+            ax[1].set_ylabel(r'$\omega$')
+            ax[1].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[1].set_title(r'Single scattering albedo, $\omega$')
+
+            ax[2].plot(sizes, g[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[2].plot(sizes, g[plot_idx,:], "o", markersize=2, color="black")
+            ax[2].set_xscale('log')
+            ax[2].set_ylim(0, 1)
+            ax[2].set_ylabel('g')
+            ax[2].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+            ax[2].set_title(r'Asymmetry factor, g')
+
+            for j in range(3):
+                ax[j].legend(loc='best') 
+
+    plt.tight_layout()
+    plt.show()
+
+    return 
+
+
+
 
 def OptPropExtract(OptProp_path: str, header: str):
 
@@ -671,7 +836,7 @@ def OptPropExtract(OptProp_path: str, header: str):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {qext[l+j,i]:.6E}")
+                    f.write(f" {qext[l+k,i]:.6E}")
                 f.write("\n")
     
     #Write single scattering albedo
@@ -687,7 +852,7 @@ def OptPropExtract(OptProp_path: str, header: str):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {ssa[l+j,i]:.6E}")
+                    f.write(f" {ssa[l+k,i]:.6E}")
                 f.write("\n")
 
     #Write asymmetry parameter
@@ -703,6 +868,6 @@ def OptPropExtract(OptProp_path: str, header: str):
                 k = k + 5
             if lastline != 0:
                 for l in range(lastline):
-                    f.write(f" {g[l+j,i]:.6E}")
+                    f.write(f" {g[l+k,i]:.6E}")
                 f.write("\n") 
     return
