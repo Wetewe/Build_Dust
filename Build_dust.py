@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.special as sps
 from scipy.interpolate import Akima1DInterpolator
+from matplotlib.ticker import LogLocator, ScalarFormatter
 
 #SIZE DISTRIBUTIONS AND AUXILIARY FUNCTIONS
 def GammaSD(a, b, r): #As described in Mishchenko and Travis 1998 Eq. (39).
@@ -764,9 +765,6 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
 
     return 
 
-
-
-
 def OptPropExtract(OptProp_path: str, header: str):
 
     OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
@@ -785,8 +783,8 @@ def OptPropExtract(OptProp_path: str, header: str):
         for j in range(rmie_num):
             if ssa[i,j] <= 0.:
                 ssa[i,j] = 0
-            #if g[i,j] <= 0.:
-                #g[i,j] = np.abs(0)
+            if g[i,j] <= 0.:
+                g[i,j] = 0
 
 
     #Write header, nº of wvls and nº of radii in file
