@@ -1081,3 +1081,37 @@ def FXXAve(FXX_path: str, OptProp_path: str,
     output.to_csv(output_path, sep="\t", index=False, float_format='%.7f')
         
     return
+
+
+def FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
+    #Read data from TMat file
+    TMat = pd.read_csv(TMat_path, sep='\\s+', comment="#", header=None)
+
+    angles = TMat[0]
+    F11 = TMat[1]
+    F12 = TMat[5]
+    F22 = TMat[2]
+    F33 = TMat[3]
+    F43 = -1.0*TMat[6]
+    F44 = TMat[4]
+
+    #Find index closer to 30 degrees
+    norm_idx = np.argmin(np.abs(angles - 30))
+
+    #Decide which data goes into the output file
+    if element == "F11": data = F11/F11[norm_idx]
+    elif element == "F12": data = F12/F11
+    elif element == "F22": data = F22/F11
+    elif element == "F33": data = F33/F11
+    elif element == "F43": data = F43/F11
+    elif element == "F44": data = F44/F11
+    else:
+        print("Please choose a valid matrix element")
+        return
+    
+    #Create output file
+    output_path = "outputFXXRewrite.dat"
+    output = pd.DataFrame({"#Wavelength(um)": wvl, "Scattering angle(°)": angles, f"{element} (T-Matrix output)": data})
+    output.to_csv(output_path, sep="\t", index=False, float_format='%.7f') 
+
+    return

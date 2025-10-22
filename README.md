@@ -1,7 +1,11 @@
------------------------- README FILE FOR BUILD_DUST ------------------------
+--------------------------------------------------------------------------------
 These Python functions are meant to facilitate the implementation of scatterer
-optical properties, calculated using TAMUdust2020, into the LMD-GCM. Here is a
+optical properties, calculated using TAMUdust2020, into the LMD-GCM. Some other
+functions dedicated to work with the scattering matrix are also included; specifically
+to compare the computations from TAMUdust2020 and T-Matrix code. Here is a
 brief explanation of the main functions inputs, outputs and important notes.
+
+################################# OPTICAL PROPERTIES UTILITIES #################################
 
 #1. OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, plot: bool = True)
 
@@ -69,4 +73,53 @@ brief explanation of the main functions inputs, outputs and important notes.
 
     Plots an arbitrary number of LMD-GCM optical properties files, i.e. the ones included in their datadir
     or the ones outputed by WriteGCMFormat or OptPropExtract.
+    
+################################# SCATTERING MATRIX UTILITIES #################################
+
+#1 FXXReadTamu(FXX_path: str, OptProp_path: str):
+    
+    This function takes the PXX.dat file and isca.dat file from the same TAMUdust2020 run in order
+    to output a 3-dimensional (wvl,size,angle) FXX array and the wavelengths, r_mie and angles axis.
+
+    FXX_path -> Path to "PXX.dat" file
+    OptProp_path -> Path to "isca.dat" file
+
+    Usage: FXX_array, wvls, rmies, angles = FXXReadTamu(FXX_path, OptProp_path)
+
+    Note: the rmie axis is the projected surface-area-equivalent sphere radius that TAMUdust outputs
+    but averaged over all wavelenghts
+
+#2 FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
+
+    Takes a PXX.dat and isca.dat files in order to extract the data of the PXX.dat file for a single
+    r_mie value, which needs to be specified. The output is a file whose format is designed to work with
+    FXXPlot.
+
+    rmie_set -> r_mie value in micrometers
+
+#3 FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
+
+    Takes the scattering matrix outputed by the T-Matrix code and converts it to a file readable
+    by FXXPlot. The T-Matrix output format has to be changed slightly (an example is provided).
+
+    TMat_path -> Path to the T-Matrix output
+
+    wvl -> The wavelength value (in micrometers) that was inputed into the T-Matrix code
+    element -> The scattering matrix element that wants to be extracted
+
+#4 FXXAve(FXX_path: str, OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, plot: bool = True)
+
+    Averages the PXX.dat given a specific size distribution defined by 2 parameters. Works exactly like
+    OptPropAve. The output is readable by FXXPlot.
+
+#5 FXXPlot(*FXXfile_path: str, wvl_set: float, ylabel: str = "", title: str = ""):
+
+    Plots a scattering matrix element.
+
+    FXXfile_path -> Path(s) to scattering matrix element file(s). File format are the outputs from
+                    FXXAve, FXXtoFile and FXXRewrtie
+    ylabel -> ylabel of the plot
+    title -> Title of the plot. ALSO MUST BE EQUAL TO THE MATRIX ELEMENT THAT IS GOING TO BE PLOTTED.
+                This is because F11 is normalized and the elements have different ylims in the plot.
+                Options are: F11, F12, F22, F33, F43 and F44
     
