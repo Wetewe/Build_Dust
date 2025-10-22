@@ -869,3 +869,215 @@ def OptPropExtract(OptProp_path: str, header: str):
                     f.write(f" {g[l+k,i]:.6E}")
                 f.write("\n") 
     return
+
+
+def FXXReadTAMU(FXX_path: str, OptProp_path: str):
+
+    #Read files
+    OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
+    FXX = pd.read_csv(FXX_path, sep='\\s+', comment="#", header=None)
+    
+    #Read wvls and sizes axis from isca.dat
+    wvls, wvls_num, rmies, rmies_num = OptPropAxis(OptProp)
+
+    #Read angles axis from FXX.dat
+    angles = FXX.iloc[0,:]
+    angles_num = len(angles)
+
+    #Create 3dim array to store FXX
+    FXX_array = np.zeros((wvls_num, rmies_num, angles_num))
+
+    #Store information from file to array
+    k = 1
+    for i in range(wvls_num):
+        for j in range(rmies_num):
+            FXX_array[i,j,:] = FXX.iloc[k,:]
+            k = k+1
+
+    return FXX_array, wvls, rmies, angles
+
+
+def FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
+
+    #Get FXX, wvls and rmies arrays
+    FXX_array, wvls, rmies, angles = FXXReadTAMU(FXX_path, OptProp_path)
+
+    #Find the position of specific size
+    rmie_idx = np.argmin(np.abs(rmies - rmie_set))
+
+    #Trick that could probably be done more elegantly
+    wvls_num = len(wvls)
+    angles_num = len(angles)
+
+    wvls_temp = np.zeros((wvls_num*angles_num))
+    angles_temp = np.zeros((wvls_num*angles_num))
+    FXX_temp = np.zeros((wvls_num*angles_num))
+
+    k = 0
+    for i in range(wvls_num):
+        for j in range(angles_num):
+            wvls_temp[k] = wvls[i]
+            angles_temp[k] = angles[j]
+            FXX_temp[k] = FXX_array[i, rmie_idx, j]
+            k = k+1
+
+    #output 
+    output_path = "outputFXXtoFile.dat"
+    output = pd.DataFrame({"#Wavelength(um)": wvls_temp, "Scattering angle(°)": angles_temp, f"FXX (rmie={rmies[rmie_idx]})": FXX_temp})
+    output.to_csv(output_path, sep="\t", index=False, float_format='%.7f')
+
+    return
+
+
+
+def FXXPlot(*FXXfile_path: str, wvl_set: float,
+            ylabel: str = "", title: str = ""):
+
+    fig, ax = plt.subplots(1, 1, figsize=(7,7))
+
+    #Loop to plot files
+    for i in FXXfile_path:
+        FXXfile = pd.read_csv(i, sep='\\s+', comment="#", header=None)
+
+        #Read wvls axis from FXXfile
+        k = 0
+        wvls = []
+        for j in range(len(FXXfile[0]) - 1):
+            if j == 0:
+                wvls.append(FXXfile.iloc[0,0])
+                wvl_temp = wvls[k]
+            if wvl_temp != FXXfile.iloc[j+1,0]:
+                wvls.append(FXXfile.iloc[j+1,0])
+                k = k + 1
+                wvl_temp = wvls[k]
+
+        wvls = np.array(wvls)
+        wvls_num = len(wvls)
+
+        #Read scattering angles axis from FXXfile
+        angles = []
+        for j in range(len(FXXfile[1]) - 1):
+            if j == 0:
+                angles.append(FXXfile.iloc[0,1])
+            if FXXfile.iloc[j+1,1] not in angles:
+                angles.append(FXXfile.iloc[j+1,1])
+
+        angles = np.array(angles)
+        angles_num = len(angles)
+
+        #Read values and create final array
+        FXX = np.zeros((wvls_num, angles_num))
+        FXX_temp = FXXfile[2]
+
+        #Organize array
+        k = 0
+        for j in range(wvls_num):
+            for l in range(angles_num):
+                FXX[j,l] = FXX_temp[k]
+                k = k+1
+        
+        #Fix wavelength to be plotted
+        wvl_idx = np.argmin(np.abs(wvls - wvl_set))
+
+        #Specific setting for every matrix element
+        if title == "F11":
+            ax.set_yscale("log")
+            ax.set_ylim(0.01,1000)
+            norm_idx = np.argmin(np.abs(angles - 30)) #normalization to 30deg
+            for j in range(wvls_num):
+                FXX[j,:] = FXX[j,:] / FXX[j,norm_idx]
+        elif title == "F12":
+            for j in range(wvls_num):
+                FXX[j,:] = -1.0 * FXX[j,:]
+                ax.set_ylim(-0.5,0.5)
+        elif title == "F22":
+            ax.set_ylim(0,1)
+        elif title == "F33":
+            ax.set_ylim(-1,1)
+        elif title == "F43":
+            ax.set_ylim(-0.5,0.5)
+            #for j in range(wvls_num):
+            #    FXX[j,:] = -1.0 * FXX[j,:]
+        elif title == "F44":
+            ax.set_ylim(-1,1)
+        else:
+            title = "WARNING: Unspecified matrix element"
+
+        #Plot
+        ax.set_title(f"{title}")
+        ax.set_xlabel("Scattering angle (deg)")
+        ax.set_xlim(0,180)
+        ax.set_ylabel(f"{ylabel}")
+        ax.grid(True)
+        ax.plot(angles, FXX[wvl_idx, :], linewidth=1, label=f"{i}, wvl={wvls[wvl_idx]}um")
+        #ax.plot(angles, FXX[wvl_idx, :], "o", markersize=2, color="black")
+        ax.legend(loc="best")
+        
+    plt.show()
+
+    return
+
+
+def FXXAve(FXX_path: str, OptProp_path: str,
+           r_eff: float, v_eff: float, SD_choice: int,
+           plot: bool = True):
+
+    #Read data from FXX file
+    FXX, wvls, rmies, angles = FXXReadTAMU(FXX_path, OptProp_path)
+
+    #Read data from OptProp file
+    OptProp = pd.read_csv(OptProp_path, sep='\\s+', comment="#", header=None)
+    parea, qext, ssa, g = OptPropArrays(OptProp)
+
+    #Initialize arrays
+    angles_num = len(angles)
+    wvls_num = len(wvls)
+    sizes_num = len(rmies)
+
+    rmie_TAMU = np.zeros((wvls_num, sizes_num))
+    qsca = np.zeros((wvls_num,sizes_num))
+    FXX_avg = np.zeros((wvls_num, angles_num))
+
+    n_A_qsca_P = np.zeros((wvls_num, sizes_num, angles_num))
+    n_A_qsca = np.zeros((wvls_num, sizes_num))
+
+    #Here we transform the projected surface area outputed by TAMUdust into rmie
+    for i in range(wvls_num):
+        for j in range(sizes_num):
+            rmie_TAMU[i,j] = np.sqrt(parea[i,j]/np.pi)
+
+    #Calculates the scattering efficiency Qsca from ssa and Qext
+    for i in range(wvls_num):
+        for j in range(sizes_num):
+            qsca[i,j] = ssa[i,j]*qext[i,j]
+
+    #Averaging!
+    for i in range(wvls_num):
+        n_A_qsca[i,:] = SD(r_eff, v_eff, rmie_TAMU[i,:], SD_choice)*parea[i,:]*qsca[i,:]
+        denom_P = np.trapezoid(n_A_qsca[i,:], rmie_TAMU[i,:])
+
+        for j in range(angles_num):
+            n_A_qsca_P[i,:,j] = n_A_qsca[i,:]*FXX[i,:,j]
+            numer_P = np.trapezoid(n_A_qsca_P[i,:,j], rmie_TAMU[i,:])
+
+            FXX_avg[i,j] = numer_P / denom_P
+
+    #Trick that could probably be done more elegantly
+    wvls_temp = np.zeros((wvls_num*angles_num))
+    angles_temp = np.zeros((wvls_num*angles_num))
+    FXX_temp = np.zeros((wvls_num*angles_num))
+
+    k = 0
+    for i in range(wvls_num):
+        for j in range(angles_num):
+            wvls_temp[k] = wvls[i]
+            angles_temp[k] = angles[j]
+            FXX_temp[k] = FXX_avg[i, j]
+            k = k+1
+
+    #Save averaged FXX in file
+    output_path = "outputFXXAve.dat"
+    output = pd.DataFrame({"#Wavelength(um)": wvls_temp, "Scattering angle(°)": angles_temp, f"FXX (r_eff={r_eff}, v_eff={v_eff})": FXX_temp})
+    output.to_csv(output_path, sep="\t", index=False, float_format='%.7f')
+        
+    return
