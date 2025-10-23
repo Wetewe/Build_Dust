@@ -287,7 +287,7 @@ def OptPropAve(OptProp_path: str, r_eff: float, v_eff: float, SD_choice: int, pl
             SD_name = f'Log-NormalSD reff={r_eff}um nueff={v_eff}'
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-        x_axis = np.linspace(1e-6,35,num=200)
+        x_axis = np.linspace(1e-6,12,num=10000)
         ax.plot(x_axis, SD(r_eff, v_eff, x_axis, SD_choice), linewidth=2, color='purple', label=SD_name)
         ax.set_title('Size distributions used for averaging the optical properties')
         ax.set_xlabel('Surface area equivalent sphere radius, r_A (um)')
@@ -602,9 +602,10 @@ def OptPropPlotTAMU(*OptProp_path: str, mode: str = "wvls", value: float):
 
     return
 
-def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
+def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", value: float = 5.):
 
     fig, ax = plt.subplots(3, 1, figsize=(12,7))
+    m = 0 #Index for labels
 
     #From the GCM OptProp file we want to extract the optical properties in order to plot them
     #Loop to plot files
@@ -694,12 +695,16 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
                 g[l,j] = g_temp[k]
                 k=k+1
 
+        #Labels
+        if Labels == []: label = i
+        else: label = Labels[m]
+
         #Choose wvl or size to plot
         if mode == "wvls":
 
             plot_idx = np.argmin(np.abs(sizes - value))
 
-            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
             ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 4)
@@ -707,7 +712,7 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
             ax[0].set_xlabel(r'Wavelength ($\mu$m)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
             ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
@@ -715,7 +720,7 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
             ax[1].set_xlabel(r'Wavelength ($\mu$m)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={sizes[plot_idx]:.2f}um")
+            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
             ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
@@ -733,7 +738,7 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
 
             sizes = sizes*2*np.pi / plot_value #Transform rmie into size parameter
 
-            ax[0].plot(sizes, qext[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[0].plot(sizes, qext[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
             ax[0].plot(sizes, qext[plot_idx,:], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 4)
@@ -741,7 +746,7 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
             ax[0].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(sizes, ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[1].plot(sizes, ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
             ax[1].plot(sizes, ssa[plot_idx,:], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
@@ -749,7 +754,7 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
             ax[1].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(sizes, g[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[2].plot(sizes, g[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
             ax[2].plot(sizes, g[plot_idx,:], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
@@ -759,6 +764,8 @@ def OptPropPlotGCM(*OptProp_path: str, mode: str = "wvls", value: float = 5.):
 
             for j in range(3):
                 ax[j].legend(loc='best') 
+
+        m = m + 1 #Label index
 
     plt.tight_layout()
     plt.show()
@@ -931,9 +938,10 @@ def FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
 
 
 def FXXPlot(*FXXfile_path: str, wvl_set: float,
-            ylabel: str = "", title: str = ""):
+            Labels: list = [],ylabel: str = "", title: str = ""):
 
     fig, ax = plt.subplots(1, 1, figsize=(7,7))
+    m = 0 #Index for labels
 
     #Loop to plot files
     for i in FXXfile_path:
@@ -1003,15 +1011,21 @@ def FXXPlot(*FXXfile_path: str, wvl_set: float,
         else:
             title = "WARNING: Unspecified matrix element"
 
+        #Labels
+        if Labels == []: label = i
+        else: label = Labels[m]
+
         #Plot
         ax.set_title(f"{title}")
         ax.set_xlabel("Scattering angle (deg)")
         ax.set_xlim(0,180)
         ax.set_ylabel(f"{ylabel}")
         ax.grid(True)
-        ax.plot(angles, FXX[wvl_idx, :], linewidth=1, label=f"{i}, wvl={wvls[wvl_idx]}um")
+        ax.plot(angles, FXX[wvl_idx, :], linewidth=1, label=f"{label}, wvl={wvls[wvl_idx]}um")
         #ax.plot(angles, FXX[wvl_idx, :], "o", markersize=2, color="black")
         ax.legend(loc="best")
+
+        m = m + 1
         
     plt.show()
 
@@ -1019,8 +1033,7 @@ def FXXPlot(*FXXfile_path: str, wvl_set: float,
 
 
 def FXXAve(FXX_path: str, OptProp_path: str,
-           r_eff: float, v_eff: float, SD_choice: int,
-           plot: bool = True):
+           r_eff: float, v_eff: float, SD_choice: int):
 
     #Read data from FXX file
     FXX, wvls, rmies, angles = FXXReadTAMU(FXX_path, OptProp_path)

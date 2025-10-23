@@ -100,7 +100,20 @@ brief explanation of the main functions inputs, outputs and important notes.
 #3 FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
 
     Takes the scattering matrix outputed by the T-Matrix code and converts it to a file readable
-    by FXXPlot. The T-Matrix output format has to be changed slightly (an example is provided).
+    by FXXPlot. The T-Matrix output format has to be changed slightly:
+
+    #              F11        F22        F33        F44        F12        F34
+       0.00   180.3983   180.3440   180.3440   180.2896     0.0000     0.0000
+       4.86    87.7971    87.7363    87.7108    87.7065     0.2087     1.7386
+       9.73    15.5732    15.5183    15.4246    15.4233     0.0515     0.8264
+      14.59     6.0786     6.0273     5.9719     5.9682    -0.0879     0.1740
+      19.46     2.9397     2.8965     2.8444     2.8416     0.0173     0.0791
+                                                                            .
+                                                                            .
+                                                                            .
+     180.00     0.9372     0.6596    -0.6596    -0.3821     0.0000     0.0000
+     
+    (With the 180deg line being the last line of the file)
 
     TMat_path -> Path to the T-Matrix output
 
