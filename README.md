@@ -29,7 +29,7 @@ brief explanation of the main functions inputs, outputs and important notes.
     SD_path -> Path to the size distribution file, that should have exclusively two columns. First column is
                 projected surface area equivalent sphere radius (r_mie, in um) and second column is n(r_mie)
 
-#3 WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
+#3 OptPropWriteGCM(sizes: np.array, wvls: np.array, header: str, files: list):
 
     Takes the files outputed by OptPropAve/OptPropAve_Disc and merges them into a single file
     readable by the LMD-GCM
@@ -89,7 +89,7 @@ brief explanation of the main functions inputs, outputs and important notes.
     Note: the rmie axis is the projected surface-area-equivalent sphere radius that TAMUdust outputs
     but averaged over all wavelenghts
 
-#2 FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
+#2 FXXExtractTAMU(FXX_path: str, OptProp_path: str, rmie_set: float):
 
     Takes a PXX.dat and isca.dat files in order to extract the data of the PXX.dat file for a single
     r_mie value, which needs to be specified. The output is a file whose format is designed to work with
@@ -97,7 +97,7 @@ brief explanation of the main functions inputs, outputs and important notes.
 
     rmie_set -> r_mie value in micrometers
 
-#3 FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
+#3 FXXExtractTMAT(TMat_path: str, wvl: float ,element: str = "F11"):
 
     Takes the scattering matrix outputed by the T-Matrix code and converts it to a file readable
     by FXXPlot. The T-Matrix output format has to be changed slightly:

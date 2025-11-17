@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.special as sps
 from scipy.interpolate import Akima1DInterpolator
-from matplotlib.ticker import LogLocator, ScalarFormatter
+from matplotlib.ticker import FormatStrFormatter, ScalarFormatter
 
 #SIZE DISTRIBUTIONS AND AUXILIARY FUNCTIONS
 def GammaSD(a, b, r): #As described in Mishchenko and Travis 1998 Eq. (39).
@@ -103,9 +103,9 @@ def OptPropArrays(OptProp: pd.DataFrame):
     
     return parea, qext, ssa, g
 
-########################################
+#### OPTICAL PROPERTIES UTILITIES ####
 
-def WriteGCMFormat(sizes: np.array, wvls: np.array, header: str, files: list):
+def OptPropWriteGCM(sizes: np.array, wvls: np.array, header: str, files: list):
     #Some necessary actions and definitions
     wvls_num = len(wvls)
     sizes_num = len(sizes)
@@ -453,7 +453,6 @@ def OptPropAve_Disc(OptProp_path: str, SD_path: str, plot: bool = True):
 
     return
 
-
 def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
 
     #RI file is expected to be 3 columns: 1-wvl, 2-real part, 3-im. part
@@ -498,10 +497,10 @@ def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
 
     return
 
-
-def OptPropPlotTAMU(*OptProp_path: str, mode: str = "wvls", value: float):
+def OptPropPlotTAMU(*OptProp_path: str, Labels: list = [], mode: str = "wvls", value: float):
 
     fig, ax = plt.subplots(3, 1, figsize=(12,7))
+    m = 0 #Index for labels
 
     #Loop to plot files
     for i in OptProp_path:
@@ -532,36 +531,41 @@ def OptPropPlotTAMU(*OptProp_path: str, mode: str = "wvls", value: float):
                 rmie_TAMU[j,l] = np.sqrt(parea_temp[k]/np.pi) #Here we transform the projected surface area outputed by TAMUdust into rmie
                 k=k+1
 
+        #Labels
+        if Labels == []: label = i
+        else: label = Labels[m]
+
         #Choose wvl or size to plot
         if mode == "wvls":
             plot_idx = np.argmin(np.abs(rmie_TAMU[0,:] - value))
 
-            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{rmie_TAMU[0,plot_idx]:.2f}"r"$\mu$m")
             ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 3)
             ax[0].set_ylabel(r'$Q_{ext}$')
-            ax[0].set_xlabel(r'Wavelength ($\mu$m)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{rmie_TAMU[0,plot_idx]:.2f}"r"$\mu$m")
             ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
             ax[1].set_ylabel(r'$\omega$')
-            ax[1].set_xlabel(r'Wavelength ($\mu$m)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{i}, rmie={rmie_TAMU[0,plot_idx]:.2f}um")
+            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{rmie_TAMU[0,plot_idx]:.2f}"r"$\mu$m")
             ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
             ax[2].set_ylabel('g')
-            ax[2].set_xlabel(r'Wavelength ($\mu$m)')
             ax[2].set_title(r'Asymmetry factor, g')
 
             for j in range(3):
-                ax[j].legend(loc='best') 
+                ax[j].legend(loc='best')
+                ax[j].grid(True, which="both")
+                ax[j].set_xlabel(r'Wavelength ($\mu$m)')
+                ax[j].xaxis.set_major_formatter(FormatStrFormatter("%.0f"))
+                ax[j].xaxis.set_minor_formatter(ScalarFormatter()) 
 
 
         elif mode == "sizes":
@@ -570,39 +574,41 @@ def OptPropPlotTAMU(*OptProp_path: str, mode: str = "wvls", value: float):
 
             rmie_TAMU[plot_idx,:] = rmie_TAMU[plot_idx,:]*2*np.pi / plot_value #Transform rmie into size parameter
 
-            ax[0].plot(rmie_TAMU[plot_idx,:], qext[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[0].plot(rmie_TAMU[plot_idx,:], qext[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[0].plot(rmie_TAMU[plot_idx,:], qext[plot_idx,:], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 3)
             ax[0].set_ylabel(r'$Q_{ext}$')
-            ax[0].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(rmie_TAMU[plot_idx,:], ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[1].plot(rmie_TAMU[plot_idx,:], ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[1].plot(rmie_TAMU[plot_idx,:], ssa[plot_idx,:], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
             ax[1].set_ylabel(r'$\omega$')
-            ax[1].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(rmie_TAMU[plot_idx,:], g[plot_idx,:], linewidth=1, markersize=2, label=f"{i}, wvl={wvls[plot_idx]:.2f}um")
+            ax[2].plot(rmie_TAMU[plot_idx,:], g[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[2].plot(rmie_TAMU[plot_idx,:], g[plot_idx,:], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
             ax[2].set_ylabel('g')
-            ax[2].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[2].set_title(r'Asymmetry factor, g')
 
             for j in range(3):
-                ax[j].legend(loc='best') 
+                ax[j].legend(loc='best')
+                ax[j].grid(True, which="both")
+                ax[j].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+                ax[j].xaxis.set_major_formatter(FormatStrFormatter("%.2f"))  
 
+        m = m + 1 #Label index
+        
     plt.tight_layout()
     plt.show()
 
     return
 
-def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", value: float = 5.):
+def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", value: float = 1.5):
 
     fig, ax = plt.subplots(3, 1, figsize=(12,7))
     m = 0 #Index for labels
@@ -704,32 +710,34 @@ def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", va
 
             plot_idx = np.argmin(np.abs(sizes - value))
 
-            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
+            ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 4)
             ax[0].set_ylabel(r'$Q_{ext}$')
-            ax[0].set_xlabel(r'Wavelength ($\mu$m)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
+            ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
             ax[1].set_ylabel(r'$\omega$')
-            ax[1].set_xlabel(r'Wavelength ($\mu$m)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{label}, rmie={sizes[plot_idx]:.2f}um")
+            ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
             ax[2].set_ylabel('g')
-            ax[2].set_xlabel(r'Wavelength ($\mu$m)')
             ax[2].set_title(r'Asymmetry factor, g')
 
-            for j in range(3):
-                ax[j].legend(loc='best') 
+            for j in range(3): #Common settings
+                ax[j].legend(loc='best')
+                ax[j].grid(True, which="both")
+                ax[j].set_xlabel(r'Wavelength ($\mu$m)')
+                ax[j].xaxis.set_major_formatter(FormatStrFormatter("%.0f"))
+                ax[j].xaxis.set_minor_formatter(ScalarFormatter())
+                 
 
 
         elif mode == "sizes":
@@ -738,32 +746,32 @@ def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", va
 
             sizes = sizes*2*np.pi / plot_value #Transform rmie into size parameter
 
-            ax[0].plot(sizes, qext[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
+            ax[0].plot(sizes, qext[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[0].plot(sizes, qext[plot_idx,:], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
             ax[0].set_ylim(0, 4)
             ax[0].set_ylabel(r'$Q_{ext}$')
-            ax[0].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
-            ax[1].plot(sizes, ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
+            ax[1].plot(sizes, ssa[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[1].plot(sizes, ssa[plot_idx,:], "o", markersize=2, color="black")
             ax[1].set_ylim(0, 1)
             ax[1].set_xscale('log')
             ax[1].set_ylabel(r'$\omega$')
-            ax[1].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
 
-            ax[2].plot(sizes, g[plot_idx,:], linewidth=1, markersize=2, label=f"{label}, wvl={wvls[plot_idx]:.2f}um")
+            ax[2].plot(sizes, g[plot_idx,:], linewidth=1, markersize=2, label=f"{label}," r" $\lambda=$" f"{wvls[plot_idx]:.2f}"r"$\mu$m")
             ax[2].plot(sizes, g[plot_idx,:], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
             ax[2].set_ylim(0, 1)
             ax[2].set_ylabel('g')
-            ax[2].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
             ax[2].set_title(r'Asymmetry factor, g')
 
             for j in range(3):
-                ax[j].legend(loc='best') 
+                ax[j].legend(loc='best')
+                ax[j].grid(True, which="both")
+                ax[j].set_xlabel(r'Size parameter (2*$\pi$*$r_{mie}$/$\lambda$)')
+                ax[j].xaxis.set_major_formatter(FormatStrFormatter("%.2f"))                
 
         m = m + 1 #Label index
 
@@ -877,6 +885,7 @@ def OptPropExtract(OptProp_path: str, header: str):
                 f.write("\n") 
     return
 
+#### SCATTERING MATRIX UTILITIES ####
 
 def FXXReadTAMU(FXX_path: str, OptProp_path: str):
 
@@ -903,8 +912,7 @@ def FXXReadTAMU(FXX_path: str, OptProp_path: str):
 
     return FXX_array, wvls, rmies, angles
 
-
-def FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
+def FXXExtractTAMU(FXX_path: str, OptProp_path: str, rmie_set: float):
 
     #Get FXX, wvls and rmies arrays
     FXX_array, wvls, rmies, angles = FXXReadTAMU(FXX_path, OptProp_path)
@@ -929,13 +937,11 @@ def FXXtoFile(FXX_path: str, OptProp_path: str, rmie_set: float):
             k = k+1
 
     #output 
-    output_path = "outputFXXtoFile.dat"
+    output_path = "outputFXXExtractTAMU.dat"
     output = pd.DataFrame({"#Wavelength(um)": wvls_temp, "Scattering angle(°)": angles_temp, f"FXX (rmie={rmies[rmie_idx]})": FXX_temp})
     output.to_csv(output_path, sep="\t", index=False, float_format='%.7f')
 
     return
-
-
 
 def FXXPlot(*FXXfile_path: str, wvl_set: float,
             Labels: list = [],ylabel: str = "", title: str = ""):
@@ -1031,7 +1037,6 @@ def FXXPlot(*FXXfile_path: str, wvl_set: float,
 
     return
 
-
 def FXXAve(FXX_path: str, OptProp_path: str,
            r_eff: float, v_eff: float, SD_choice: int):
 
@@ -1089,14 +1094,13 @@ def FXXAve(FXX_path: str, OptProp_path: str,
             k = k+1
 
     #Save averaged FXX in file
-    output_path = "outputFXXAve.dat"
+    output_path = f"outputFXXAve_reff{r_eff}_veff{v_eff}.dat"
     output = pd.DataFrame({"#Wavelength(um)": wvls_temp, "Scattering angle(°)": angles_temp, f"FXX (r_eff={r_eff}, v_eff={v_eff})": FXX_temp})
     output.to_csv(output_path, sep="\t", index=False, float_format='%.7f')
         
     return
 
-
-def FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
+def FXXExtractTMAT(TMat_path: str, wvl: float ,element: str = "F11"):
     #Read data from TMat file
     TMat = pd.read_csv(TMat_path, sep='\\s+', comment="#", header=None)
 
@@ -1123,8 +1127,119 @@ def FXXRewrite(TMat_path: str, wvl: float ,element: str = "F11"):
         return
     
     #Create output file
-    output_path = "outputFXXRewrite.dat"
+    output_path = "outputFXXExtractTMAT.dat"
     output = pd.DataFrame({"#Wavelength(um)": wvl, "Scattering angle(°)": angles, f"{element} (T-Matrix output)": data})
     output.to_csv(output_path, sep="\t", index=False, float_format='%.7f') 
+
+    return
+
+
+def FXXWriteGCM(sizes: np.array, wvls: np.array, angles: np.array, header: str, files: list, orifile_path: str):
+    #Some necessary actions and definitions
+    wvls_num = len(wvls)
+    sizes_num = len(sizes)
+    angles_num = len(angles)
+    files_num = len(files)
+    sizes = sizes * 1e-6 #Change from um to m (LMD-GCM reads meters)
+    wvls = wvls * 1e-6
+    output_path = "outputFXXWriteGCM.dat"
+
+    #Create and index array that signals the position of desired angles
+    # over the original array
+    orifile = pd.read_csv(orifile_path, sep='\\s+', comment="#", header=None)
+    ori_angles = orifile.iloc[0,:]
+    ori_angles_num = len(ori_angles)
+
+    idx_array = np.zeros((angles_num))
+    for i in range(angles_num):
+        for j in range(ori_angles_num):
+            if (angles[i] == ori_angles[j]):
+                idx_array[i] = j
+
+    idx_array = idx_array.astype(int)
+
+    #Foolproofing
+    if files_num != sizes_num:
+        return print(f"Error: number of files given ({files_num}) is not equal to number of sizes ({sizes_num})")
+    
+    #Write header, nº of wvls and nº of radii in file
+    with open(output_path, "w") as f:
+        f.write(f"{header}\n")
+        f.write(f"# Number of wavelengths (nwvl):\n  {wvls_num}\n")
+        f.write(f"# Number of radius (nsize):\n  {sizes_num}\n")
+        f.write(f"# Number of angles (nang):\n  {angles_num}\n")
+
+    #Write wvls axis
+    with open(output_path, "a") as f:
+        f.write("# Wavelength axis (wvl):\n")
+        k = 0
+        groups = wvls_num//5 #Number of groups of 5 lines
+        lastline = wvls_num - groups*5 #Number of elements in last line either 1,2,3 or 4
+        for i in range(groups):
+            f.write(f" {wvls[0+k]:.6E} {wvls[1+k]:.6E} {wvls[2+k]:.6E} {wvls[3+k]:.6E} {wvls[4+k]:.6E}\n")
+            k = k + 5
+        if lastline != 0:
+            for i in range(lastline):
+                f.write(f" {wvls[k+i]:.6E}")
+            f.write("\n")
+
+    #Write sizes axis
+    with open(output_path, "a") as f:
+        f.write("# Particle size axis (radius):\n")
+        k = 0
+        groups = sizes_num//5 #Number of groups of 5 lines
+        lastline = sizes_num - groups*5 #Number of elements in last line either 1,2,3 or 4
+        for i in range(groups):
+            f.write(f" {sizes[0+k]:.6E} {sizes[1+k]:.6E} {sizes[2+k]:.6E} {sizes[3+k]:.6E} {sizes[4+k]:.6E}\n")
+            k = k + 5
+        if lastline != 0:
+            for i in range(lastline):
+                f.write(f" {sizes[k+i]:.6E}")
+            f.write("\n")
+
+    #Write angles axis
+    with open(output_path, "a") as f:
+        f.write("# Scattering angle axis (ang):\n")
+        k = 0
+        groups = angles_num//5 #Number of groups of 5 lines
+        lastline = angles_num - groups*5 #Number of elements in last line either 1,2,3 or 4
+        for i in range(groups):
+            f.write(f" {angles[0+k]:.6E} {angles[1+k]:.6E} {angles[2+k]:.6E} {angles[3+k]:.6E} {angles[4+k]:.6E}\n")
+            k = k + 5
+        if lastline != 0:
+            for i in range(lastline):
+                f.write(f" {angles[k+i]:.6E}")
+            f.write("\n")
+    
+    # Write scattering matrix element
+    with open(output_path,"a") as f:
+        f.write("# Scattering matrix element (FXX):\n")
+        groups = wvls_num//5
+        lastline = wvls_num - groups*5
+        for i in range(angles_num):
+            f.write(f"# Angle number     {i+1}\n")
+            for j in range(sizes_num):
+                p1 = 0
+                f.write(f"# Radius number     {j+1}\n")
+
+                #Store FXX in 2dim array: [wvls,angles]
+                FXX = np.zeros((wvls_num, ori_angles_num))
+                FXX_data = pd.read_csv(files[j], sep='\\s+', comment="#", header=None)
+                FXX_temp = np.array(FXX_data.iloc[:,2])
+                p2 = 0
+                for k in range(wvls_num):
+                    for l in range(ori_angles_num):
+                        FXX[k,l] = FXX_temp[p2]
+                        p2 = p2 + 1
+                
+                # Actual writing process
+                a = idx_array[i]
+                for k in range(groups):
+                    f.write(f" {FXX[0+p1,a]:.6E} {FXX[1+p1,a]:.6E} {FXX[2+p1,a]:.6E} {FXX[3+p1,a]:.6E} {FXX[4+p1,a]:.6E}\n")
+                    p1 = p1 + 5
+                if lastline != 0:
+                    for k in range(lastline):
+                        f.write(f" {FXX[k+p1,a]:.6E}")
+                    f.write("\n")
 
     return
