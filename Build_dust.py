@@ -4,6 +4,7 @@ import pandas as pd
 import scipy.special as sps
 from scipy.interpolate import Akima1DInterpolator
 from matplotlib.ticker import FormatStrFormatter, ScalarFormatter
+from scipy.constants import h, c, k
 
 #SIZE DISTRIBUTIONS AND AUXILIARY FUNCTIONS
 def GammaSD(a, b, r): #As described in Mishchenko and Travis 1998 Eq. (39).
@@ -102,6 +103,19 @@ def OptPropArrays(OptProp: pd.DataFrame):
             k=k+1
     
     return parea, qext, ssa, g
+
+def NormPlanck(wvl: np.array, T: float, peak: float):
+    #wvl is inputted in um but changed to m
+    wvl_m = wvl * 1e-6
+
+    a = 2*h*c**2 / wvl**5
+    b = 1 / (np.exp((h*c)/(wvl_m*k*T)) - 1)
+
+    B = a*b
+    Bn = B / np.trapezoid(B,wvl)
+    Bn = Bn * peak / Bn.max()
+
+    return Bn
 
 #### OPTICAL PROPERTIES UTILITIES ####
 
@@ -467,8 +481,23 @@ def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
     inter_n = Akima1DInterpolator(wvls_ori,n)
     inter_k = Akima1DInterpolator(wvls_ori,k)
 
+    #Data that is going to be writen in files
+    write_n = inter_n(wvls_int)
+    write_k = inter_k(wvls_int)
+
+    #Some filtering that may be necessary for use in TAMUdust
+    kernel = "LW"
+    #Minimum k for SW kernel
+    if kernel == "SW":
+        for i in range(len(write_k)):
+            if write_k[i] < 0.0001: write_k[i] = 0.0001
+    elif kernel == "LW":
+        for i in range(len(write_k)):
+            if write_k[i] < 0.001: write_k[i] = 0.001 
+
+
     #Write interpolation
-    inter_RI = pd.DataFrame({"# Wvl (um) visible": wvls_int, "  # n": inter_n(wvls_int), "  # k": inter_k(wvls_int)})
+    inter_RI = pd.DataFrame({"# Wvl (um) visible": wvls_int, "  # n": write_n, "  # k": write_k})
     inter_RI.to_csv("outputInterpolateRI.txt", sep="\t", index=False, float_format="%.10f")
 
     #Plot if needed
@@ -478,17 +507,17 @@ def InterpolateRI(RI_path: str, wvls_int: np.array, plot: bool = False):
         ax[0].plot(wvls_ori, n, linewidth=1, color='red')
         ax[0].plot(wvls_int, inter_n(wvls_int), linewidth=1, color='orange', label='interpolation')
         ax[0].plot(wvls_int, inter_n(wvls_int), 'x', markersize=2, color='black')
+        ax[0].set_xscale("log")
         ax[0].set_ylabel('Real part of RI')
         ax[0].set_title('Refractive index: m=n+ik')
-        ax[0].ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
 
         ax[1].plot(wvls_ori, k, 'o', markersize=1, color='purple', label='k')
         ax[1].plot(wvls_ori, k, linewidth=1, color='purple')
         ax[1].plot(wvls_int, inter_k(wvls_int), linewidth=1, color='blue', label='interpolation')
         ax[1].plot(wvls_int, inter_k(wvls_int), 'x', markersize=2, color='black')
+        ax[1].set_xscale("log")
         ax[1].set_ylabel('Imaginary part of RI')
         ax[1].set_xlabel('Wavelength (m)')
-        ax[1].ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
 
         for j in range(2):
             ax[j].legend(loc='best')   
@@ -705,6 +734,9 @@ def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", va
         if Labels == []: label = i
         else: label = Labels[m]
 
+        #ylims
+        ylims=(4,1,1)
+
         #Choose wvl or size to plot
         if mode == "wvls":
 
@@ -713,13 +745,13 @@ def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", va
             ax[0].plot(wvls, qext[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[0].plot(wvls, qext[:,plot_idx], "o", markersize=2, color="black")
             ax[0].set_xscale('log')
-            ax[0].set_ylim(0, 4)
+            ax[0].set_ylim(0, ylims[0])
             ax[0].set_ylabel(r'$Q_{ext}$')
             ax[0].set_title(r'Extinction efficiency factor, $Q_{ext}$')
 
             ax[1].plot(wvls, ssa[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[1].plot(wvls, ssa[:,plot_idx], "o", markersize=2, color="black")
-            ax[1].set_ylim(0, 1)
+            ax[1].set_ylim(0, ylims[1])
             ax[1].set_xscale('log')
             ax[1].set_ylabel(r'$\omega$')
             ax[1].set_title(r'Single scattering albedo, $\omega$')
@@ -727,16 +759,28 @@ def OptPropPlotGCM(*OptProp_path: str, Labels: list = [], mode: str = "wvls", va
             ax[2].plot(wvls, g[:,plot_idx], linewidth=1, markersize=2, label=f"{label}," r" $r_{Mie}=$"f"{sizes[plot_idx]:.2f}"r"$\mu$m")
             ax[2].plot(wvls, g[:,plot_idx], "o", markersize=2, color="black")
             ax[2].set_xscale('log')
-            ax[2].set_ylim(0, 1)
+            ax[2].set_ylim(0, ylims[2])
             ax[2].set_ylabel('g')
             ax[2].set_title(r'Asymmetry factor, g')
 
             for j in range(3): #Common settings
                 ax[j].legend(loc='best')
-                ax[j].grid(True, which="both")
+                ax[j].grid(True, which="both", axis="y")
                 ax[j].set_xlabel(r'Wavelength ($\mu$m)')
                 ax[j].xaxis.set_major_formatter(FormatStrFormatter("%.0f"))
                 ax[j].xaxis.set_minor_formatter(ScalarFormatter())
+
+                if (np.max(wvls) <= 5):
+                    ax[j].axvline(x=0.5, linestyle='--', color='red', linewidth=1.5)
+                    ax[j].axvline(x=5, linestyle='--', color='red', linewidth=1.5)
+                    bbaxis = np.logspace(-0.7,0.7,100)
+                    ax[j].plot(bbaxis,NormPlanck(bbaxis,6000,ylims[j]),linewidth=1,linestyle="--",color="grey")
+                if (np.max(wvls) >= 5):
+                    ax[j].axvline(x=5, linestyle='--', color='red', linewidth=1.5)
+                    ax[j].axvline(x=11.56, linestyle='--', color='red', linewidth=1.5)
+                    ax[j].axvline(x=20, linestyle='--', color='red', linewidth=1.5)
+                    bbaxis = np.logspace(0.7,2,300)
+                    ax[j].plot(bbaxis,NormPlanck(bbaxis,215,ylims[j]),linewidth=1,linestyle="--",color="grey")                    
                  
 
 
@@ -1132,7 +1176,6 @@ def FXXExtractTMAT(TMat_path: str, wvl: float ,element: str = "F11"):
     output.to_csv(output_path, sep="\t", index=False, float_format='%.7f') 
 
     return
-
 
 def FXXWriteGCM(sizes: np.array, wvls: np.array, angles: np.array, header: str, files: list, orifile_path: str):
     #Some necessary actions and definitions
