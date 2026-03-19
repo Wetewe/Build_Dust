@@ -73,6 +73,10 @@ brief explanation of the main functions inputs, outputs and important notes.
 
     Plots an arbitrary number of LMD-GCM optical properties files, i.e. the ones included in their datadir
     or the ones outputed by WriteGCMFormat or OptPropExtract.
+
+#8 OptPropInverse(OptProp_path: str):
+
+    Takes an LMD-GCM optical properties look-up table and transforms it into a readable format for OptPropAve
     
 ################################# SCATTERING MATRIX UTILITIES #################################
 

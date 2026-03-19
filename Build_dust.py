@@ -945,7 +945,7 @@ def OptPropExtract(OptProp_path: str, header: str):
                 f.write("\n") 
     return
 
-def OptPropInverse(OptProp_path: str, v_eff: float = 0.05):
+def OptPropInverse(OptProp_path: str):
     nwvl_found = False
     nwvl_assigned = False
     nsize_found = False
